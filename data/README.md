@@ -1,0 +1,1 @@
+[Trading academy dot com](https://eatradingacademy.com/software/forex-historical-data/)
