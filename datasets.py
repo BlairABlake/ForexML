@@ -17,6 +17,9 @@ class ForexData(Dataset):
         else:
             self.data = pd.read_csv(data_file, names=["date", "Open", "High", "Low", "Close"], sep=sep)
 
+        self.scaler = StandardScaler().fit(self.data[self.order_mapping["ohlc"]])
+        self.data[self.order_mapping["ohlc"]] = self.scaler.transform(self.data[self.order_mapping["ohlc"]])
+
         self.data_order = data_order
         self.input_duation = input_duration
         self.output_duration = output_duration
@@ -26,9 +29,16 @@ class ForexData(Dataset):
         return self.data.shape[0] - (self.input_duation+self.interval+self.output_duration)
 
     def __getitem__(self, index):
-        return (
-            self.data.iloc[index:index+self.input_duation][self.order_mapping[self.data_order]].to_numpy(), 
+        return \
+            self.data.iloc[index:index+self.input_duation][self.order_mapping[self.data_order]].to_numpy(), \
             self.data.iloc[index+self.input_duation+self.interval:index+self.input_duation+self.interval+self.output_duration][self.order_mapping[self.data_order]].to_numpy()
-        )
+        
     
-class ForexPricePredictionDataset(ForexData, Dataset): pass
+class ForexPricePredictionDataset(ForexData, Dataset):
+    def __getitem__(self, index):
+        x, t = super().__getitem__(index)
+        return \
+            np.expand_dims(x, axis=1).astype(np.double), \
+            t.astype(np.double)
+        
+    
