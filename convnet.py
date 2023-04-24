@@ -32,7 +32,7 @@ if __name__ == "__main__":
     input_duraion = 20
     output_duration = 20
     lr = 1e-4
-    num_epochs = 40
+    num_epochs = 200
 
     dataset = ForexPricePredictionDataset(data_file="./data/USDJPY_H1.csv", input_duration=input_duraion, output_duration=output_duration, data_order="c", header=0)
     dataset_loader = DataLoader(dataset, batch_size=64, shuffle=True)
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
     traindata_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    testdata_loader = DataLoader(test_dataset, batch_size=64, shuffle=True)
 
     model = ConvNet(input_size=input_duraion, output_size=output_duration)
     loss_fn = nn.MSELoss()
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     for epoch in range(num_epochs):
         running_loss = 0.0
-        for x, t in dataset_loader:
+        for x, t in traindata_loader:
             optimizer.zero_grad()
             y = model(x.float())
             loss = loss_fn(y, t.float())
@@ -57,3 +58,12 @@ if __name__ == "__main__":
             optimizer.step()
         
         print(f"Epoch: {epoch}  Loss: {running_loss}")
+    
+    loss = 0.0
+    for x, t in testdata_loader:
+        y = model(x.float())
+        loss = loss_fn(y, t.float())
+        loss.backward()
+        loss += loss.item()
+    
+    print(f"Test    Loss: {loss}")
