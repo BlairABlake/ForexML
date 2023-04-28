@@ -1,69 +1,81 @@
-import torch.nn as nn
-from torch import optim
-from torch.utils.data import DataLoader, random_split
 from datasets import ForexPricePredictionDataset
+from torch.utils.data import DataLoader
+import torch
+import torch.nn as nn
+import yfinance as yf
+import numpy as np
+import matplotlib.pyplot as plt
 
-class ConvNet(nn.Module):
-    def __init__(self, input_size, output_size, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class Convnet(nn.Module):
+    def __init__(self, input_num=32):
+        super().__init__()
 
-        self.conv = nn.Sequential(
-            nn.Conv1d(
-                in_channels=input_size,
-                out_channels=32,
-                kernel_size=5,
-                padding='same'
-            ),
-            nn.ReLU()
-        )
-
-        self.fc = nn.Sequential(
+        self.input_num = input_num
+        
+        self.model = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=1, kernel_size=3, padding="same"),
+            nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=1, out_channels=1, kernel_size=3, padding="same"),
+            nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=1, out_channels=1, kernel_size=3, padding="same"),
+            nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(32, 1024),
-            nn.Dropout(0.5),
-            nn.Linear(1024, output_size)
+            nn.Linear(in_features=input_num//8, out_features=32),
+            nn.ReLU(),
+            nn.Linear(in_features=32, out_features=1)
         )
-
+    
     def forward(self, x):
-        x = self.conv(x)
-        return self.fc(x)
+        return self.model(x)
     
 if __name__ == "__main__":
-    input_duraion = 20
-    output_duration = 20
-    lr = 1e-4
-    num_epochs = 200
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
 
-    dataset = ForexPricePredictionDataset(data_file="./data/USDJPY_H1.csv", input_duration=input_duraion, output_duration=output_duration, data_order="c", header=0)
-    dataset_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+    input_num = 32
+    model = Convnet(input_num).double().to(device=device)
+    dataset = ForexPricePredictionDataset("./data/USDJPY_H1.csv", header=0, data_order="c", input_duration=input_num, output_duration=1, normalize=False)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.L1Loss()
 
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-    traindata_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    testdata_loader = DataLoader(test_dataset, batch_size=64, shuffle=True)
+    epochs = 1000
 
-    model = ConvNet(input_size=input_duraion, output_size=output_duration)
-    loss_fn = nn.MSELoss()
-    optimizer = optim.SGD(model.parameters(), lr=lr)
-
-    for epoch in range(num_epochs):
+    for epoch in range(epochs):
         running_loss = 0.0
-        for x, t in traindata_loader:
+
+        for i, data in enumerate(dataloader):
+            x, y = data
+            x = torch.squeeze(x, 2)
+            x = torch.unsqueeze(x, 1)
             optimizer.zero_grad()
-            y = model(x.float())
-            loss = loss_fn(y, t.float())
+            outputs = model(x.to(device=device))
+            loss = criterion(outputs, y.to(device=device))
             loss.backward()
-            running_loss += loss.item()
             optimizer.step()
-        
-        print(f"Epoch: {epoch}  Loss: {running_loss}")
+
+            running_loss += loss.item()
+            if i % 2000 == 1999: 
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.5f}')
+                running_loss = 0.0
     
-    loss = 0.0
-    for x, t in testdata_loader:
-        y = model(x.float())
-        loss = loss_fn(y, t.float())
-        loss.backward()
-        loss += loss.item()
+    torch.save(model.state_dict(), "./model_states")
     
-    print(f"Test    Loss: {loss}")
+    model = Convnet(input_num=input_num).double()
+    model.load_state_dict(torch.load("./model_states"))
+    ticker = yf.Ticker("USDJPY=X")
+    data = ticker.history(period='40h', interval="1h")
+    data = data["Close"].to_numpy()
+    for i in range(10):
+        with torch.no_grad():
+            data = torch.tensor(data[-input_num:])
+            prediction = model(data).numpy()[0]
+            data = np.append(data, prediction)
+
+    plt.plot(data)
+    plt.show()

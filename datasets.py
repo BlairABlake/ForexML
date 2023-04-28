@@ -6,6 +6,7 @@ from scipy.stats import linregress
 
 class ForexData(Dataset):
     order_mapping = {
+        "tohlc": ["Time", "Open", "High", "Low", "Close"],
         "ohlc": ["Open", "High", "Low", "Close"],
         "o": ["Open"],
         "h": ["High"],
@@ -73,7 +74,16 @@ class ForexPricePredictionDataset(ForexDataWithInterval):
     def __getitem__(self, index):
         x, t = super().__getitem__(index)
         return \
-            x[:, 0], \
-            t[:, 0]
+            x, \
+            t[0,:]
+    
+class ForexPriceBinaryPredictionDataset(ForexDataWithInterval):
+    def __getitem__(self, index):
+        x, t = super().__getitem__(index)
+        flag = 0.0
+        if x[-1, 0] <= t[0, 0]: flag = 1.0
+        return \
+            x, \
+            flag
         
     
