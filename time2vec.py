@@ -106,6 +106,20 @@ def predict(data, model=None, checkpoint_path=""):
 def pred2label(pred):
   prob = nn.functional.softmax(pred, dim=1).numpy()[0]
   return np.random.choice(["down", "stationary", "up"], p=prob)
+
+
+
+def time2vec(data):
+    activation = {}
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach()
+        return hook
+    
+    model = Time2Vec()
+    model.fc_vec.register_forward_hook(get_activation('fc_vec'))
+    prediction = predict(data, model)
+    return activation["fc_vec"]
         
 
 if __name__ == "__main__":
