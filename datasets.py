@@ -13,11 +13,11 @@ class ForexData(Dataset):
         "l": ["Low"],
         "c": ["Close"]
     }
-    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True):
+    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True, time_index=True):
         if header != -1:
             self._data =  pd.read_csv(data_file, header=header, sep=sep)
         else:
-            self._data = pd.read_csv(data_file, names=["date", "Open", "High", "Low", "Close"], sep=sep)
+            self._data = pd.read_csv(data_file, names=["Time", "Open", "High", "Low", "Close"], sep=sep)
 
         if normalize:
             self.scaler = StandardScaler().fit(self._data[self.order_mapping["ohlc"]])
@@ -26,7 +26,11 @@ class ForexData(Dataset):
         self.data_order = data_order
 
         self.data = self._data[self.order_mapping[self.data_order]]
-    
+
+        if "Time" in list(self.data.columns) and time_index:
+            self.data["Time"] = pd.to_datetime(self.data["Time"])
+            self.data = self.data.set_index("Time")
+
     def __len__(self):
         return self.data.shape[0] - 1
 
@@ -44,21 +48,35 @@ class ForexDataLinregressMixin(ForexData):
         return list(zip(range(len(data)), data))
 
 class ForexDataWithInterval(ForexData):
-    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True, input_duration=10, output_duration=10, interval=0):
-        super().__init__(data_file, header, sep, data_order, normalize=normalize)
+    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True, input_duration=10, output_duration=10, interval=0, time_index=True):
+        super().__init__(data_file, header, sep, data_order, normalize=normalize, time_index=time_index)
         self.data_order = data_order
         self.input_duation = input_duration
         self.output_duration = output_duration
         self.interval = interval
+
+    def getInterval(self, index):
+        return self.data.iloc[index:index+self.input_duation], \
+               self.data.iloc[index+self.input_duation+self.interval:index+self.input_duation+self.interval+self.output_duration]
     
     def __len__(self):
         return self.data.shape[0] - (self.input_duation+self.interval+self.output_duration)
 
     def __getitem__(self, index):
+        x, y = self.getInterval(index)
         return \
-            self.data.iloc[index:index+self.input_duation].to_numpy(), \
-            self.data.iloc[index+self.input_duation+self.interval:index+self.input_duation+self.interval+self.output_duration].to_numpy()
-        
+            x.to_numpy(), \
+            y.to_numpy()
+
+class ForexDataWithWindow(ForexDataWithInterval):
+    def getInterval(self, index):
+        x,y = super().getInterval(index)
+        return x
+
+    def __getitem__(self, index):
+        x, y = super().__getitem__(index)
+        return x
+  
 class ForexDataLinregresswithInterval(ForexDataWithInterval, ForexDataLinregressMixin):
 
     def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", input_duration=10, output_duration=10, interval=0):

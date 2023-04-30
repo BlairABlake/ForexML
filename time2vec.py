@@ -2,7 +2,7 @@ from lightning.pytorch.utilities.types import STEP_OUTPUT
 from torchvision.datasets import ImageFolder
 from torch import optim, nn, utils, Tensor
 from torchvision.transforms import Normalize, Resize, ToTensor, Compose, ToPILImage
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import resnet50, ResNet50_Weights, swin_s, Swin_S_Weights
 import lightning.pytorch as pl
 from torchmetrics.functional import accuracy
 from torch.utils.data import DataLoader
@@ -20,7 +20,7 @@ class Time2Vec(pl.LightningModule):
 
         self.vec_length = vec_length
 
-        self.resnet = resnet50(ResNet50_Weights)
+        self.resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
         for param in self.resnet.parameters():
             param.requires_grad = False
 
@@ -99,27 +99,32 @@ def predict(data, model=None, checkpoint_path=""):
     model.eval()
 
     with torch.no_grad():
-        prediction = model(torch.unsqueeze(image, dim=0))
+        pred = model(torch.unsqueeze(image, dim=0))
+        prob = nn.functional.softmax(pred, dim=1).numpy()[0]
     
-    return prediction
+    return prob
 
-def pred2label(pred):
-  prob = nn.functional.softmax(pred, dim=1).numpy()[0]
+def prob2label(prob):
   return np.random.choice(["down", "stationary", "up"], p=prob)
 
+def most_probable(prob):
+    return ["down", "stationary", "up"][np.argmax(prob)]
 
 
-def time2vec(data):
+
+def time2vec(data, model=None, checkpoint_path=""):
     activation = {}
     def get_activation(name):
         def hook(model, input, output):
             activation[name] = output.detach()
         return hook
     
-    model = Time2Vec()
+    if model is None:
+        model = Time2Vec.load_from_checkpoint(checkpoint_path=checkpoint_path, map_location="cpu")
+    model.eval()
     model.fc_vec.register_forward_hook(get_activation('fc_vec'))
     prediction = predict(data, model)
-    return activation["fc_vec"]
+    return activation["fc_vec"].numpy()
         
 
 if __name__ == "__main__":
