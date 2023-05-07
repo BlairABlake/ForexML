@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from forexenv import ForexTradingEnv
-from dqn import DQNAgent
+from models.dqn import DQNAgent
 import gc
 
 historical_data = pd.read_csv('data2010_usdjpy.csv', names=['date', 'Open', 'High', 'Low', 'Close'])

@@ -13,7 +13,7 @@ class ForexData(Dataset):
         "l": ["Low"],
         "c": ["Close"]
     }
-    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True, time_index=True):
+    def __init__(self, data_file, header=-1, sep="\t", data_order="ohlc", normalize=True, time_index=True, data=None):
         if header != -1:
             self._data =  pd.read_csv(data_file, header=header, sep=sep)
         else:
