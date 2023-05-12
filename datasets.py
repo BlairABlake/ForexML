@@ -93,7 +93,7 @@ class ForexPricePredictionDataset(ForexDataWithInterval):
         x, t = super().__getitem__(index)
         return \
             x, \
-            t[0,:]
+            t
     
 class ForexPriceBinaryPredictionDataset(ForexDataWithInterval):
     def __getitem__(self, index):
