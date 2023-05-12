@@ -3,8 +3,13 @@ import matplotlib.pyplot as plt
 import argparse
 from tqdm import tqdm
 import os
+import platform
 from multiprocessing import Pool
 from contextlib import closing
+import ctypes
+from ctypes import cdll, CDLL
+import gc
+
 
 from datasets import ForexPricePredictionDataset
 
@@ -41,11 +46,23 @@ def _save_wrapper(args):
    _save(*args)
 
 def saveall(data, root, duration=30, interval=15, threshold=0.03, progress_bar=False):
-    with closing(Pool()) as p:
-        if progress_bar:
-            list(tqdm(p.imap(_save_wrapper, [[data.iloc[i-(duration+1):i], root, duration, threshold] for i in range(duration+1, len(data), interval)]), total=len(data)-(duration+interval)))
-        else:
-            p.starmap(_save, [[data.iloc[i-(duration+1):i], root, duration, threshold] for i in range(duration+1, len(data), interval)])
+
+    length = len(data) // 100
+    splited_data = [data.iloc[i-length:i] for i in range(length, len(data), length)]
+
+    def f(data):
+        for i in range(duration+1, len(data), interval):
+            d = [data.iloc[i-(duration+1):i], root, duration, threshold]
+            yield d
+
+
+    for d in tqdm(splited_data):
+        it = f(d)
+        with closing(Pool()) as p:
+            if progress_bar:
+                list(p.imap(_save_wrapper, it))
+            else:
+                p.starmap(_save, it)
 
 
 if __name__ == "__main__":
