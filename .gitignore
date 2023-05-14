@@ -6,6 +6,8 @@ stationary/
 lightning_logs/
 *.pt
 *.ckpt
+*.zip
+*.npz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

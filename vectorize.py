@@ -6,6 +6,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", default="images")
     parser.add_argument("--model")
     parser.add_argument("--save", default="time2vec")
+    parser.add_argument("--progress", default=False, type=bool)
     args = parser.parse_args()
 
     transforms = Compose([
@@ -19,11 +20,11 @@ if __name__ == "__main__":
         transforms,
     )
 
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
     
     model = Time2Vec.load_from_checkpoint(args.model, map_location="cpu")
 
-    vectors, labels = dataloader2vec(dataloader, model, return_label=True)
+    vectors, labels = dataloader2vec(dataloader, model, return_label=True, progress_bar=args.progress)
 
     np.savez(args.save, vectors, labels)
 

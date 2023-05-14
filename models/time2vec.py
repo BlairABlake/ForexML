@@ -110,14 +110,14 @@ def predict_from_raw(data, model=None, checkpoint_path="", batch=False):
         else:
             pred = model(torch.unsqueeze(image, dim=0))
     
-        prob = nn.functional.softmax(pred, dim=1).numpy()[0]
+        prob = nn.functional.softmax(pred, dim=1)[0]
 
     return prob
 
 def predict(img, model, batch=False):
     with torch.no_grad():
         preds = model(img) if batch else model(torch.unsqueeze(img, dim=0))
-        prob = nn.functional.softmax(preds, dim=1).numpy()[0]
+        prob = nn.functional.softmax(preds, dim=1)[0]
     return prob
 
 def prob2label(prob):
@@ -138,7 +138,7 @@ def time2vec_from_raw(data, model=None, checkpoint_path="", batch=False):
 
     model.fc_vec.register_forward_hook(get_activation('fc_vec'))
     prediction = predict_from_raw(data, model, batch=batch)
-    return activation["fc_vec"].numpy()
+    return activation["fc_vec"]
 
 def time2vec(data, model=None, checkpoint_path="", batch=False):
     activation = {}
@@ -160,8 +160,8 @@ def dataloader2vec(data_loader, model, progress_bar=False, return_label=False):
 
     data_loader = tqdm(data_loader) if progress_bar else data_loader
     for data in data_loader:
-        vectors += time2vec(data[0], model=model, batch=True)
-        labels += data[1]
+        vectors += time2vec(data[0], model=model, batch=True).cpu()
+        labels += data[1].cpu()
 
     vectors = np.stack(vectors)
     
